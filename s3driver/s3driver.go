@@ -1,9 +1,12 @@
 package s3driver
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"mime"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -296,24 +299,43 @@ func (d *S3Driver) GetFile(path string, position int64) (io.ReadCloser, bool) {
 	return resp.Body, true
 }
 
+// PutFile uploads a file to S3
 func (d *S3Driver) PutFile(path string, reader io.Reader) bool {
-	// if _, path_exists := d.Files[path]; !path_exists {
-	// 	if _, path_parent_exists := d.Files[filepath.Dir(path)]; path_parent_exists {
-	// 		bytes, err := ioutil.ReadAll(reader)
-	// 		if err != nil {
-	// 			return false
-	// 		}
-	//
-	// 		d.Files[path] = &MemoryFile{graval.NewFileItem(filepath.Base(path), int64(len(bytes)), time.Now().UTC()), bytes}
-	//
-	// 		return true
-	// 	} else {
-	// 		return false
-	// 	}
-	// } else {
-	// 	return false
-	// }
-	return false
+	svc := d.s3service()
+
+	path = strings.TrimPrefix(path, "/")
+	fileExt := filepath.Ext(path)
+
+	contentType := mime.TypeByExtension(fileExt)
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(reader)
+
+	params := &s3.PutObjectInput{
+		Bucket:      aws.String(d.AWSBucketName), // Required
+		Key:         aws.String(path),            // Required
+		Body:        bytes.NewReader(buf.Bytes()),
+		ContentType: aws.String(contentType),
+	}
+	resp, err := svc.PutObject(params)
+
+	if awserr := aws.Error(err); awserr != nil {
+		// A service error occurred.
+		fmt.Println("Error:", awserr.Code, awserr.Message)
+		return false
+	} else if err != nil {
+		// A non-service error occurred.
+		panic(err)
+		return false
+	}
+
+	// Pretty-print the response data.
+	fmt.Println(awsutil.StringValue(resp))
+
+	return true
 }
 
 func stringInSlice(a string, list []string) bool {
