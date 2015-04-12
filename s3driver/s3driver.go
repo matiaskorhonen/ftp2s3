@@ -16,6 +16,7 @@ import (
 	"github.com/koofr/graval"
 )
 
+// S3Driver ...
 type S3Driver struct {
 	Username               string
 	Password               string
@@ -38,10 +39,10 @@ func pathToS3PathPrefix(path string) *string {
 
 	if path == "" || strings.HasSuffix(path, "/") {
 		return aws.String(path)
-	} else {
-		p := string(path) + "/"
-		return aws.String(p)
 	}
+
+	p := string(path) + "/"
+	return aws.String(p)
 }
 
 func (d *S3Driver) s3DirContents(path string, maxKeys int64, marker string) (*s3.ListObjectsOutput, error) {
@@ -75,6 +76,7 @@ func (d *S3Driver) s3DirContents(path string, maxKeys int64, marker string) (*s3
 	return resp, err
 }
 
+// Authenticate checks that the FTP username and password match
 func (d *S3Driver) Authenticate(username string, password string) bool {
 	return username == d.Username && password == d.Password
 }
@@ -158,7 +160,7 @@ func (d *S3Driver) ChangeDir(path string) bool {
 // DirContents lists “directory” contents on S3
 func (d *S3Driver) DirContents(path string) ([]os.FileInfo, bool) {
 	moreObjects := true
-	objects := make([]*s3.Object, 0)
+	var objects []*s3.Object
 
 	var resp *s3.ListObjectsOutput
 	var err error
@@ -182,8 +184,8 @@ func (d *S3Driver) DirContents(path string) ([]os.FileInfo, bool) {
 	}
 
 	prefix := pathToS3PathPrefix(path)
-	files := make([]os.FileInfo, 0)
-	dirs := make([]string, 0)
+	var files []os.FileInfo
+	var dirs []string
 
 	for _, object := range objects {
 		p := *object.Key
@@ -211,37 +213,13 @@ func (d *S3Driver) DirContents(path string) ([]os.FileInfo, bool) {
 	return files, true
 }
 
+// DeleteDir would delete a directory, but isn't currently implemented
 func (d *S3Driver) DeleteDir(path string) bool {
-	// if f, ok := d.Files[path]; ok && f.File.IsDir() {
-	// 	haschildren := false
-	// 	for p, _ := range d.Files {
-	// 		if strings.HasPrefix(p, path+"/") {
-	// 			haschildren = true
-	// 			break
-	// 		}
-	// 	}
-	//
-	// 	if haschildren {
-	// 		return false
-	// 	}
-	//
-	// 	delete(d.Files, path)
-	//
-	// 	return true
-	// } else {
-	// 	return false
-	// }
 	return false
 }
 
+// DeleteFile deletes the files from the given path
 func (d *S3Driver) DeleteFile(path string) bool {
-	// if f, ok := d.Files[path]; ok && !f.File.IsDir() {
-	// 	delete(d.Files, path)
-	// 	return true
-	// } else {
-	// 	return false
-	// }
-
 	svc := d.s3service()
 	path = strings.TrimPrefix(path, "/")
 
@@ -264,39 +242,8 @@ func (d *S3Driver) DeleteFile(path string) bool {
 	return true
 }
 
-func (d *S3Driver) Rename(from_path string, to_path string) bool {
-	// if f, from_path_exists := d.Files[from_path]; from_path_exists {
-	// 	if _, to_path_exists := d.Files[to_path]; !to_path_exists {
-	// 		if _, to_path_parent_exists := d.Files[filepath.Dir(to_path)]; to_path_parent_exists {
-	// 			if f.File.IsDir() {
-	// 				delete(d.Files, from_path)
-	// 				d.Files[to_path] = &MemoryFile{graval.NewDirItem(filepath.Base(to_path)), nil}
-	// 				torename := make([]string, 0)
-	// 				for p, _ := range d.Files {
-	// 					if strings.HasPrefix(p, from_path+"/") {
-	// 						torename = append(torename, p)
-	// 					}
-	// 				}
-	// 				for _, p := range torename {
-	// 					sf := d.Files[p]
-	// 					delete(d.Files, p)
-	// 					np := to_path + p[len(from_path):]
-	// 					d.Files[np] = sf
-	// 				}
-	// 			} else {
-	// 				delete(d.Files, from_path)
-	// 				d.Files[to_path] = &MemoryFile{graval.NewFileItem(filepath.Base(to_path), f.File.Size(), f.File.ModTime()), f.Content}
-	// 			}
-	// 			return true
-	// 		} else {
-	// 			return false
-	// 		}
-	// 	} else {
-	// 		return false
-	// 	}
-	// } else {
-	// 	return false
-	// }
+// Rename isn't supported directly on S3
+func (d *S3Driver) Rename(fromPath string, toPath string) bool {
 	return false
 }
 
