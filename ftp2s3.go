@@ -25,7 +25,7 @@ func init() {
 	flag.IntVar(&port, "port", 2121, "port to bind to")
 	flag.StringVar(&username, "ftp-username", "ftp2s3", "FTP username")
 	flag.StringVar(&password, "ftp-password", "ftp2s3", "FTP password")
-	flag.StringVar(&serverName, "ftp-server-an,e", "FTP2S3", "FTP server name")
+	flag.StringVar(&serverName, "ftp-server-name", "FTP2S3", "FTP server name")
 
 	flag.StringVar(&awsRegion, "aws-region", "us-east-1", "AWS region")
 	flag.StringVar(&awsAccessKeyID, "aws-access-key-id", "", "AWS access key ID")
