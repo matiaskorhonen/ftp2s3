@@ -22,6 +22,7 @@ type S3Driver struct {
 	AWSRegion              string
 	AWSCredentialsProvider aws.CredentialsProvider
 	AWSBucketName          string
+	WorkingDirectory       string
 }
 
 func (d *S3Driver) s3service() *s3.S3 {
@@ -49,8 +50,8 @@ func (d *S3Driver) s3DirContents(path string, maxKeys int64, marker string) (*s3
 	prefix := pathToS3PathPrefix(path)
 
 	params := &s3.ListObjectsInput{
-		Bucket: aws.String(d.AWSBucketName), // Required
-		// Delimiter:    aws.String("Delimiter"),
+		Bucket:    aws.String(d.AWSBucketName), // Required
+		Delimiter: aws.String(d.WorkingDirectory),
 		// EncodingType: aws.String("EncodingType"),
 		// Marker:       aws.String("Marker"),
 		MaxKeys: aws.Long(maxKeys),
@@ -130,13 +131,28 @@ func (d *S3Driver) ModifiedTime(path string) (time.Time, bool) {
 
 // ChangeDir “changes directories” on S3 if there are files under the given path
 func (d *S3Driver) ChangeDir(path string) bool {
-	resp, err := d.s3DirContents(path, 1, "")
+	// resp, err := d.s3DirContents(path, 1, "")
 
-	if err == nil && len(resp.Contents) > 0 {
-		return true
+	if strings.HasPrefix(path, "/") {
+		d.WorkingDirectory = strings.TrimPrefix(path, "/")
 	} else {
-		return false
+		if strings.HasSuffix(d.WorkingDirectory, "/") {
+			d.WorkingDirectory = d.WorkingDirectory + path
+		} else {
+			d.WorkingDirectory = d.WorkingDirectory + "/" + path
+		}
 	}
+
+	fmt.Println("PWD:", d.WorkingDirectory)
+	return true
+
+	//
+	// if err == nil && len(resp.Contents) > 0 {
+	// 	d.WorkingDirectory = strings.TrimPrefix(path, "/")
+	// 	return true
+	// } else {
+	// 	return false
+	// }
 }
 
 // DirContents lists “directory” contents on S3
@@ -175,18 +191,16 @@ func (d *S3Driver) DirContents(path string) ([]os.FileInfo, bool) {
 		p = strings.TrimPrefix(p, *prefix)
 		var fi os.FileInfo
 
-		if strings.Contains(p, "/") {
+		if strings.Contains(p, "/") || p == "" {
 
 			parts := strings.Split(p, "/")
-			dir_part := parts[0]
+			dirPart := parts[0]
 
-			// currentDir := strings.TrimSuffix(*prefix, "/") == dir_part
-
-			if dir_part != "" && dir_part != "/" && !stringInSlice(dir_part, dirs) {
-				fi = graval.NewDirItem(dir_part)
+			if dirPart != d.WorkingDirectory && dirPart != "" && dirPart != "/" && !stringInSlice(dirPart, dirs) {
+				fi = graval.NewDirItem(dirPart)
 				files = append(files, fi)
 
-				dirs = append(dirs, dir_part)
+				dirs = append(dirs, dirPart)
 			}
 		} else {
 			fi = graval.NewFileItem(*object.Key, *object.Size, *object.LastModified)
@@ -227,7 +241,27 @@ func (d *S3Driver) DeleteFile(path string) bool {
 	// } else {
 	// 	return false
 	// }
-	return false
+
+	svc := d.s3service()
+	path = strings.TrimPrefix(path, "/")
+
+	params := &s3.DeleteObjectInput{
+		Bucket: aws.String(d.AWSBucketName), // Required
+		Key:    aws.String(path),            // Required
+	}
+	_, err := svc.DeleteObject(params)
+
+	if awserr := aws.Error(err); awserr != nil {
+		// A service error occurred.
+		fmt.Println("Error:", awserr.Code, awserr.Message)
+		return false
+	} else if err != nil {
+		// A non-service error occurred.
+		panic(err)
+		return false
+	}
+
+	return true
 }
 
 func (d *S3Driver) Rename(from_path string, to_path string) bool {
@@ -293,9 +327,6 @@ func (d *S3Driver) GetFile(path string, position int64) (io.ReadCloser, bool) {
 		return nil, false
 	}
 
-	// Pretty-print the response data.
-	fmt.Println(awsutil.StringValue(resp))
-
 	return resp.Body, true
 }
 
@@ -303,7 +334,15 @@ func (d *S3Driver) GetFile(path string, position int64) (io.ReadCloser, bool) {
 func (d *S3Driver) PutFile(path string, reader io.Reader) bool {
 	svc := d.s3service()
 
-	path = strings.TrimPrefix(path, "/")
+	fmt.Println("put path: ", path)
+	fmt.Println("wd: ", d.WorkingDirectory)
+
+	if strings.HasPrefix(path, "/") {
+		path = strings.TrimPrefix(path, "/")
+	} else {
+		path = d.WorkingDirectory + path
+	}
+
 	fileExt := filepath.Ext(path)
 
 	contentType := mime.TypeByExtension(fileExt)
