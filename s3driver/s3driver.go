@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/awslabs/aws-sdk-go/aws"
+	"github.com/awslabs/aws-sdk-go/aws/awsutil"
 	"github.com/awslabs/aws-sdk-go/service/s3"
 	"github.com/koofr/graval"
 )
@@ -28,7 +29,7 @@ func (d *S3Driver) s3service() *s3.S3 {
 	return svc
 }
 
-func pathToS3Prefix(path string) *string {
+func pathToS3PathPrefix(path string) *string {
 	path = strings.TrimPrefix(path, "/")
 
 	if path == "" || strings.HasSuffix(path, "/") {
@@ -42,7 +43,7 @@ func pathToS3Prefix(path string) *string {
 func (d *S3Driver) s3DirContents(path string, maxKeys int64, marker string) (*s3.ListObjectsOutput, error) {
 	svc := d.s3service()
 
-	prefix := pathToS3Prefix(path)
+	prefix := pathToS3PathPrefix(path)
 
 	params := &s3.ListObjectsInput{
 		Bucket: aws.String(d.AWSBucketName), // Required
@@ -161,7 +162,7 @@ func (d *S3Driver) DirContents(path string) ([]os.FileInfo, bool) {
 		}
 	}
 
-	prefix := pathToS3Prefix(path)
+	prefix := pathToS3PathPrefix(path)
 	files := make([]os.FileInfo, 0)
 	dirs := make([]string, 0)
 
@@ -267,13 +268,32 @@ func (d *S3Driver) MakeDir(path string) bool {
 	return false
 }
 
+// GetFile returns a reader for the given path on S3
 func (d *S3Driver) GetFile(path string, position int64) (io.ReadCloser, bool) {
-	// if f, ok := d.Files[path]; ok && !f.File.IsDir() {
-	// 	return ioutil.NopCloser(bytes.NewReader(f.Content[position:])), true
-	// } else {
-	// 	return nil, false
-	// }
-	return nil, false
+	svc := d.s3service()
+
+	path = strings.TrimPrefix(path, "/")
+
+	params := &s3.GetObjectInput{
+		Bucket: aws.String(d.AWSBucketName), // Required
+		Key:    aws.String(path),            // Required
+	}
+	resp, err := svc.GetObject(params)
+
+	if awserr := aws.Error(err); awserr != nil {
+		// A service error occurred.
+		fmt.Println("Error:", awserr.Code, awserr.Message)
+		return nil, false
+	} else if err != nil {
+		// A non-service error occurred.
+		panic(err)
+		return nil, false
+	}
+
+	// Pretty-print the response data.
+	fmt.Println(awsutil.StringValue(resp))
+
+	return resp.Body, true
 }
 
 func (d *S3Driver) PutFile(path string, reader io.Reader) bool {
