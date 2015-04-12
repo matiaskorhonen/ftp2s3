@@ -6,6 +6,37 @@ ftp2s3 is based on the [Graval][] FTP server framework. It is very much a work i
 
 [graval]: https://github.com/koofr/graval
 
+## Usage
+
+```sh
+ftp2s3 -aws-region="eu-west-1" \
+-aws-bucket-name="my-s3-bucket" \
+-aws-access-key-id="AWS_KEY" \
+-aws-secret-access-key="AWS_SECRET" \
+-ftp-username="svimes" \
+-ftp-username="swordfish" \
+-ftp-server-name="PseudopolisYardFTPd"
+```
+
+Configuration via environment variables is also possible (e.g. `-ftp-server-name="…"` → `FTP_SERVER_NAME="…"`).
+
+Alternatively you can supply a simple configuration file:
+
+```
+# Put this into myftp.conf
+aws-region eu-west-1
+aws-bucket-name my-s3-bucket
+aws-access-key-id AWS_KEY
+aws-secret-access-key AWS_SECRET
+ftp-username svimes
+ftp-username swordfish
+ftp-server-name PseudopolisYardFTPd
+```
+
+```sh
+ftp2s3 -config="myftp.conf"
+```
+
 ## Why would I want this?
 
 If you have legacy software/hardware that doesn't support S3 directly (for example some web cameras).
